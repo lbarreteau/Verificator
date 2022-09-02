@@ -1,0 +1,159 @@
+name: Verificator
+env:
+  MIRROR_URL: "git@github.com:EpitechPromo2026/B-DOP-200-NAN-2-1-chocolatine-louis.barreteau.git"
+  MAIL_TO: "louis.barreteau@gmail.com"
+  EXECUTABLE: "chocolatine"
+on:
+  push:
+    branches-ignore:
+      - ga-ignore-**
+  pull_request:
+    branches-ignore:
+      - ga-ignore-**
+jobs:
+  check_repository_cleanliness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find useless files
+        run: |
+          TEST=$(find ./ -regextype posix-extended -regex '^(.*\/)*((.*\.(([ao])|(so)|(gcno)|(gcda)|(gcov)))|(^.*\~)|(.*\/tmp\/.+)|(#.*\#))$')
+
+          if [ "$(find ./ -type f -iname "*pain_au_chocolat*")" ];
+          then
+            TEST+=" $(find ./ -type f -iname "*pain_au_chocolat*")"
+          fi
+
+          for i in $TEST
+          do
+            echo "::error title=Unwanted file detected,file=$i::$i"
+          done
+          if [ "$TEST" ]
+          then
+            exit 1
+          fi
+
+  check_program_compilation:
+    needs: check_repository_cleanliness
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+      - name: Fetch repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Compile project
+        run: timeout 120 make
+      - name: Clear project
+        run: make clean
+      - name: Testing binary is executable
+        run: |
+          IFS=","
+          for i in ${{ env.EXECUTABLE }}
+          do
+              if [ ! -x "$i" ]
+              then
+                  exit 1
+              fi
+          done
+
+  run_tests:
+    needs: check_program_compilation
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+      - name: Fetch repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Compile unit_tests
+        run: timeout 120 make tests_run
+
+  push_to_mirror:
+    if: ${{ github.event.pull_request == false }}
+    needs: run_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Cloning repository
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url:
+            ${{ env.MIRROR_URL }}
+          ssh_private_key:
+            ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+  installing depedencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch repository
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' 
+      - run: python --version
+
+  mail_report:
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+      - name: Fetch repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: File list recovery
+        run: |
+          ls > .github/workflows/list_of_files.txt
+          echo "FILE_LIST=$(ls -Q | tr '\n' ',' | sed 's/,/, /g')" >> $GITHUB_ENV
+
+      - name: List repository size
+        run: |
+          echo "SIZE_REPOSITORY=$(du -skh --exclude=".git")" >> $GITHUB_ENV
+
+      - name: List make compilation logs
+        run: make > .github/workflows/makefile_compilation.txt
+
+      - name: List make clean compilation logs
+        run: make clean > .github/workflows/makefile_clean.txt
+
+      - name: List make fclean compilation logs
+        run: make fclean > .github/workflows/makefile_fclean.txt
+
+      - name: List units tests
+        run: make tests_run > .github/workflows/unit_tests.txt
+
+      - name: List coverage
+        run: gcovr > .github/workflows/gcovr.txt
+
+      - name: Display rondoudou
+        run: cat .github/workflows/rondoudou.txt
+
+      - name: Send mail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: louis.barreteau@gmail.com
+          password: vqyrbfskszetejaj
+          subject: Nouveau ${{ github.event_name }} par ${{ github.actor }}
+          to: ${{ env.MAIL_TO }}
+          from: Verificator
+          secure: true
+          body:
+            "Un ${{ github.event_name }} vient d'être réaliser par ${{ github.actor }}\n\
+            Le nom du commit est : ${{ github.event.head_commit.message }}\n\
+            Le répertoire ${{ github.repository }} contient ces fichiers pesant: ${{ env.SIZE_REPOSITORY  }}b\n\
+            ${{ env.FILE_LIST }}\n\
+            Pour en savoir plus : ${{ github.repositoryUrl }}\n"
+          ignore_cert: true
+          convert_markdown: true
+          attachments: .github/workflows/list_of_files.txt, .github/workflows/makefile_compilation.txt, github/workflows/makefile_clean.txt, .github/workflows/makefile_fclean.txt, .github/workflows/coding_style_bubulle.txt, .github/workflows/unit_tests.txt, .github/workflows/gcovr.txt
+          priority: normal
