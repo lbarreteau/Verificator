@@ -93,15 +93,13 @@ jobs:
 
   sas:
     runs-on: ubuntu-latest
-    container:
-      image: epitechcontent/epitest-docker
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
           cache: 'pip' # caching pip dependencies
-      - run: pip install -r requirements.txt
+      - run: echo "Hello, world!"
 
   mail_report:
     runs-on: ubuntu-latest
