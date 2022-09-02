@@ -94,12 +94,15 @@ jobs:
   sas:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: jannekem/run-python-script-action@v1
         with:
-          python-version: '3.9'
-          cache: 'pip' # caching pip dependencies
-      - run: echo "Hello, world!"
+          script: |
+            import os
+            print("Directory contents:")
+            for f in os.listdir():
+                print(f)
 
   mail_report:
     runs-on: ubuntu-latest
