@@ -91,15 +91,6 @@ jobs:
           ssh_private_key:
             ${{ secrets.GIT_SSH_PRIVATE_KEY }}
 
-  installing depedencies:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Initialise python
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - run: python --version
-
   mail_report:
     runs-on: ubuntu-latest
     container:
